@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 # ================= 0. 导入 BRICKS 三大独立组件 =================
 try:
-    from bricks_header import inject_shared_header, get_header_length, trim_redundant_header
+    from bricks_header import prepend_shared_header_tokens, get_header_length, trim_redundant_header
 except ImportError:
     print("Warning: bricks_header module not found.")
 
@@ -52,12 +52,15 @@ model.eval()
 # ================= 3. 核心算子 (接入三大组件) =================
 @torch.no_grad()
 def prefill_chunk(text):
-    if BRICKS_CONFIG["use_shared_header"]:
-        text = inject_shared_header(text)
-        
+    # 1. 独立进行严格的文档级 Tokenize
     inputs = tokenizer(text, return_tensors="pt", add_special_tokens=False).to(model.device)
     input_ids = inputs.input_ids
         
+    # 2. 调用shared_header的组件，在头部拼接 Token
+    if BRICKS_CONFIG["use_shared_header"]:
+        input_ids = prepend_shared_header_tokens(input_ids, tokenizer)
+        
+    # 3. 调用 Separator 组件，在尾部追加 Token
     if BRICKS_CONFIG["use_separator"]:
         input_ids = append_separator_tokens(input_ids, tokenizer)
         
